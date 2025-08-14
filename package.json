@@ -1,0 +1,30 @@
+{
+  "name": "line-manual-project",
+  "version": "1.0.0",
+  "description": "LINE型業務マニュアルシステム",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod",
+    "test": "node --test",
+    "start": "node api/webhook.js"
+  },
+  "keywords": [
+    "line",
+    "bot",
+    "manual",
+    "business"
+  ],
+  "author": "Development Team",
+  "license": "MIT",
+  "dependencies": {
+    "@line/bot-sdk": "^9.8.5",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
