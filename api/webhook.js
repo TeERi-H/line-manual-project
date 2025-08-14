@@ -34,10 +34,11 @@ export default async function handler(req, res) {
     // 1. 環境変数の検証
     const envValidation = validateAllEnvVars();
     if (!envValidation.success) {
-      console.error('❌ Environment validation failed');
+      console.error('❌ Environment validation failed:', envValidation.errors);
       return res.status(500).json({
         error: 'Server configuration error',
-        message: 'System is not properly configured'
+        message: 'System is not properly configured',
+        details: envValidation.errors
       });
     }
 
