@@ -3,7 +3,7 @@
 
 import { validateAllEnvVars } from '../utils/envValidator.js';
 import { verifyLineSignature, createLineClient } from '../lib/lineAuth.js';
-import { messageHandler } from '../lib/messageHandler.js';
+import { getMessageHandler } from '../lib/messageHandler.js';
 import { db } from '../lib/database.js';
 
 export default async function handler(req, res) {
@@ -169,19 +169,19 @@ async function handleMessage(event, startTime) {
     let result;
     switch (message.type) {
       case 'text':
-        result = await messageHandler.handleTextMessage(event);
+        result = await getMessageHandler().handleTextMessage(event);
         break;
       
       case 'sticker':
-        result = await messageHandler.handleStickerMessage(event);
+        result = await getMessageHandler().handleStickerMessage(event);
         break;
       
       case 'image':
-        result = await messageHandler.handleImageMessage(event);
+        result = await getMessageHandler().handleImageMessage(event);
         break;
       
       case 'audio':
-        result = await messageHandler.handleAudioMessage(event);
+        result = await getMessageHandler().handleAudioMessage(event);
         break;
       
       default:
