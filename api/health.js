@@ -12,11 +12,11 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // GETメソッドのみ許可
-  if (req.method !== 'GET') {
+  // GET/POSTメソッドを許可（LINE検証対応）
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({
       error: 'Method not allowed',
-      message: 'Only GET method is allowed'
+      message: 'Only GET and POST methods are allowed'
     });
   }
 
