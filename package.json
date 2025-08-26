@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "LINE型業務マニュアルシステム",
   "main": "index.js",
-  "type": "module",
   "scripts": {
     "dev": "node server.js",
     "dev:vercel": "vercel dev",
