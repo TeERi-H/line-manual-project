@@ -1,15 +1,6 @@
 {
   "functions": {
-    "api/webhook.js": {
-      "maxDuration": 10
-    },
-    "api/health.js": {
-      "maxDuration": 5
-    },
-    "api/test-connection.js": {
-      "maxDuration": 30
-    },
-    "api/system-test.js": {
+    "api/**/*.js": {
       "maxDuration": 30
     }
   }
