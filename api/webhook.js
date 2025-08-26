@@ -1,5 +1,5 @@
-// LINE Webhook API エンドポイント - 簡素化版
-export default async function handler(req, res) {
+// LINE Webhook API エンドポイント - CommonJS形式
+module.exports = async function handler(req, res) {
   console.log('LINE Webhook called:', req.method);
   
   // CORS対応
