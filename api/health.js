@@ -35,24 +35,10 @@ export default async function handler(req, res) {
     }
 
     // GETリクエスト = ヘルスチェック
-    const systemInfo = {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
-      service: 'LINE Manual Bot',
-      uptime: process.uptime(),
-      memory: {
-        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
-      }
-    };
-
-    // 正常なレスポンスを返す
-    res.status(200).json({
-      success: true,
-      data: systemInfo,
-      message: 'System is healthy'
+    return res.status(200).json({
+      status: 'OK',
+      message: 'LINE Bot is running',
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
