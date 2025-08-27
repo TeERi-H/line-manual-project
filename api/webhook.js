@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     console.warn(`Invalid method: ${req.method}`);
     return res.status(405).json({
       error: 'Method not allowed',
-      message: 'Only POST method is allowed'
+      message: 'Only GET and POST methods are allowed'
     });
   }
 
