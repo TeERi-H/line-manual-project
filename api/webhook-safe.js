@@ -92,7 +92,20 @@ async function handleTextMessage(event) {
     replyMessage = `📋 LINE Manual Bot ヘルプ\n\n【基本コマンド】\n• 登録 - ユーザー登録\n• ヘルプ - この画面\n• テスト - 動作確認\n• 問い合わせ - サポート\n\n【検索】\n• キーワードを入力して検索\n• 「経理」「人事」等のカテゴリ検索`;
     
   } else if (text.includes('テスト') || text.includes('test')) {
-    replyMessage = `✅ システム動作テスト結果\n\n• LINE連携: OK\n• サーバー: OK\n• データベース: 準備中\n• 時刻: ${new Date().toLocaleString('ja-JP')}\n\n全システム正常動作中です！`;
+    // データベーステストを追加
+    let dbStatus = '準備中';
+    let dbDetails = '';
+    
+    try {
+      const dbTestResult = await testDatabase();
+      dbStatus = dbTestResult.success ? 'OK ✅' : 'エラー ❌';
+      dbDetails = dbTestResult.details;
+    } catch (error) {
+      dbStatus = 'エラー ❌';
+      dbDetails = error.message;
+    }
+    
+    replyMessage = `✅ システム動作テスト結果\n\n• LINE連携: OK\n• サーバー: OK\n• データベース: ${dbStatus}\n• 時刻: ${new Date().toLocaleString('ja-JP')}\n\n${dbDetails}\n\n基本システム動作中！`;
     
   } else if (text.includes('問い合わせ') || text.includes('お問い合わせ')) {
     replyMessage = `📞 お問い合わせ\n\n問い合わせ機能は実装準備中です。\n\n【緊急時の連絡先】\n• システム管理者まで直接ご連絡ください\n• 現在のステータス: β版テスト中`;
@@ -125,4 +138,76 @@ async function handleFollowEvent(event) {
   });
 
   console.log(`✅ Welcome message sent for follow event`);
+}
+
+// Google Sheets接続テスト
+async function testDatabase() {
+  try {
+    console.log('🔍 Testing Google Sheets connection...');
+    
+    // 必要な環境変数の確認
+    const requiredEnvs = [
+      'GOOGLE_SERVICE_ACCOUNT_EMAIL',
+      'GOOGLE_PRIVATE_KEY', 
+      'SPREADSHEET_ID'
+    ];
+    
+    const missingEnvs = requiredEnvs.filter(env => !process.env[env]);
+    if (missingEnvs.length > 0) {
+      return {
+        success: false,
+        details: `環境変数未設定: ${missingEnvs.join(', ')}`
+      };
+    }
+    
+    // Google Auth の動的インポートとテスト
+    const { GoogleAuth } = await import('google-auth-library');
+    
+    const auth = new GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      },
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.readonly'
+      ],
+    });
+
+    // Google Sheets API の動的インポートとテスト
+    const { google } = await import('googleapis');
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // スプレッドシート情報取得テスト
+    const response = await sheets.spreadsheets.get({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+    });
+    
+    const title = response.data.properties.title;
+    const sheetCount = response.data.sheets.length;
+    
+    console.log(`✅ Google Sheets connection successful: ${title}`);
+    
+    return {
+      success: true,
+      details: `接続成功!\nシート: ${title}\nワークシート数: ${sheetCount}`
+    };
+    
+  } catch (error) {
+    console.error('❌ Database test failed:', error);
+    
+    let errorMessage = 'データベース接続エラー';
+    if (error.message.includes('ENOTFOUND')) {
+      errorMessage = 'ネットワーク接続エラー';
+    } else if (error.message.includes('invalid_grant')) {
+      errorMessage = 'Google認証エラー（Private Key確認要）';
+    } else if (error.message.includes('Requested entity was not found')) {
+      errorMessage = 'スプレッドシートが見つかりません';
+    }
+    
+    return {
+      success: false,
+      details: `${errorMessage}: ${error.message.slice(0, 100)}...`
+    };
+  }
 }
