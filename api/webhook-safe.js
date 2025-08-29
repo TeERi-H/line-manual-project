@@ -100,6 +100,13 @@ async function handleTextMessage(event) {
   } else if (userState.step === 'waiting_confirmation') {
     return await handleConfirmation(event, client, userId, text);
   }
+  
+  // 問い合わせフロー中の処理
+  if (userState.step === 'waiting_inquiry_content') {
+    return await handleInquiryContent(event, client, userId, text, userState);
+  } else if (userState.step === 'waiting_inquiry_confirmation') {
+    return await handleInquiryConfirmation(event, client, userId, text, userState);
+  }
 
   // 基本的なコマンド処理
   if (textLower.includes('登録') || textLower.includes('始める') || textLower.includes('register')) {
@@ -118,7 +125,18 @@ async function handleTextMessage(event) {
     }
     
   } else if (text.includes('ヘルプ') || text.includes('help')) {
-    replyMessage = `📋 LINE Manual Bot ヘルプ\n\n【基本コマンド】\n• 登録 - ユーザー登録\n• ヘルプ - この画面\n• テスト - 動作確認\n• 問い合わせ - サポート\n\n【検索】\n• キーワードを入力して検索\n• 「経理」「人事」等のカテゴリ検索`;
+    // 登録済みユーザーの権限に応じたヘルプ表示
+    const registrationStatus = await checkUserRegistration(userId);
+    if (registrationStatus.isRegistered) {
+      replyMessage = `📋 LINE Manual Bot ヘルプ\n\n【基本コマンド】\n• ヘルプ - この画面\n• テスト - 動作確認\n• 問い合わせ - サポート\n\n【マニュアル検索】\n• キーワードを入力して検索\n• 「経理」「人事」等のカテゴリ検索\n\n【検索のコツ】\n• 短いキーワードが効果的\n• ひらがな/カタカナでも検索可能`;
+      
+      // 管理者権限の場合は管理コマンドを表示
+      if (registrationStatus.permission === '管理者') {
+        replyMessage += `\n\n【管理者コマンド】\n• 管理 - 管理メニュー\n• 統計 - アクセス統計\n• 問い合わせ一覧 - 未対応問い合わせ`;
+      }
+    } else {
+      replyMessage = `📋 LINE Manual Bot ヘルプ\n\n【新規ユーザー】\n• 登録 - ユーザー登録\n• テスト - 動作確認\n\nまずは「登録」でユーザー登録を行ってください！`;
+    }
     
   } else if (text.includes('テスト') || text.includes('test')) {
     // データベーステストを追加
@@ -137,7 +155,42 @@ async function handleTextMessage(event) {
     replyMessage = `✅ システム動作テスト結果\n\n• LINE連携: OK\n• サーバー: OK\n• データベース: ${dbStatus}\n• 時刻: ${new Date().toLocaleString('ja-JP')}\n\n${dbDetails}\n\n基本システム動作中！`;
     
   } else if (text.includes('問い合わせ') || text.includes('お問い合わせ')) {
-    replyMessage = `📞 お問い合わせ\n\n問い合わせ機能は実装準備中です。\n\n【緊急時の連絡先】\n• システム管理者まで直接ご連絡ください\n• 現在のステータス: β版テスト中`;
+    // 登録済みユーザーの問い合わせ機能
+    const registrationStatus = await checkUserRegistration(userId);
+    if (registrationStatus.isRegistered) {
+      return await startInquiry(event, client, userId, registrationStatus);
+    } else {
+      replyMessage = `📞 お問い合わせをするには、まず「登録」が必要です。\n\n「登録」と入力してユーザー登録を行ってください。`;
+    }
+    
+  } else if (text.includes('管理') && !text.includes('管理者')) {
+    // 管理コマンド（管理者のみ）
+    const registrationStatus = await checkUserRegistration(userId);
+    if (registrationStatus.isRegistered && registrationStatus.permission === '管理者') {
+      return await handleAdminMenu(event, client, userId);
+    } else {
+      replyMessage = `❌ 管理者権限が必要です。`;
+    }
+    
+  } else if (text.includes('統計')) {
+    // 統計コマンド（管理者のみ）
+    const registrationStatus = await checkUserRegistration(userId);
+    if (registrationStatus.isRegistered && registrationStatus.permission === '管理者') {
+      const statsResult = await getSystemStats();
+      replyMessage = statsResult.text;
+    } else {
+      replyMessage = `❌ 管理者権限が必要です。`;
+    }
+    
+  } else if (text.includes('問い合わせ一覧')) {
+    // 問い合わせ一覧（管理者のみ）
+    const registrationStatus = await checkUserRegistration(userId);
+    if (registrationStatus.isRegistered && registrationStatus.permission === '管理者') {
+      const inquiryListResult = await getPendingInquiries();
+      replyMessage = inquiryListResult.text;
+    } else {
+      replyMessage = `❌ 管理者権限が必要です。`;
+    }
     
   } else {
     // 登録済みユーザーのキーワード検索
@@ -645,4 +698,344 @@ function formatMultipleResults(results, keyword) {
   result += `詳細を見るには、具体的なタイトルで再検索してください。\n\n「ヘルプ」で検索のコツを確認できます！`;
   
   return { text: result };
+}
+
+// 問い合わせ開始
+async function startInquiry(event, client, userId, userInfo) {
+  userStates.set(userId, {
+    step: 'waiting_inquiry_content',
+    userInfo: userInfo,
+    startTime: new Date()
+  });
+
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: `📝 問い合わせを開始します\n\n【問い合わせ内容を入力してください】\n\n• 具体的にお困りの内容\n• 要望や改善提案\n• システムの不具合報告\n• その他のご質問\n\n入力が完了したら送信してください。\n「キャンセル」で中止できます。`,
+    quickReply: {
+      items: [
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: 'キャンセル',
+            text: 'キャンセル'
+          }
+        }
+      ]
+    }
+  });
+
+  console.log(`📝 Inquiry started for user: ${userInfo.name}`);
+}
+
+// 問い合わせ内容入力処理
+async function handleInquiryContent(event, client, userId, text, userState) {
+  if (text.toLowerCase() === 'キャンセル') {
+    userStates.delete(userId);
+    await client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '❌ 問い合わせをキャンセルしました。'
+    });
+    return;
+  }
+
+  // 内容の基本チェック
+  if (text.length < 10) {
+    await client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '❌ 問い合わせ内容は10文字以上で入力してください。\n\n「キャンセル」で中止できます。'
+    });
+    return;
+  }
+
+  if (text.length > 1000) {
+    await client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '❌ 問い合わせ内容は1000文字以内で入力してください。\n\n「キャンセル」で中止できます。'
+    });
+    return;
+  }
+
+  // 確認段階へ
+  userStates.set(userId, {
+    ...userState,
+    step: 'waiting_inquiry_confirmation',
+    content: text
+  });
+
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: `📋 問い合わせ内容の確認\n\n【送信者】${userState.userInfo.name}\n【内容】\n${text}\n\n上記の内容で送信しますか？\n\n「送信」で確定\n「キャンセル」で中止`,
+    quickReply: {
+      items: [
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: '送信',
+            text: '送信'
+          }
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: 'キャンセル',
+            text: 'キャンセル'
+          }
+        }
+      ]
+    }
+  });
+}
+
+// 問い合わせ送信確認処理
+async function handleInquiryConfirmation(event, client, userId, text, userState) {
+  if (text.toLowerCase() === 'キャンセル') {
+    userStates.delete(userId);
+    await client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '❌ 問い合わせをキャンセルしました。'
+    });
+    return;
+  }
+
+  if (text === '送信') {
+    // 問い合わせを保存
+    const inquiryData = {
+      userId: userId,
+      userName: userState.userInfo.name,
+      userEmail: userState.userInfo.email,
+      content: userState.content,
+      timestamp: new Date().toISOString()
+    };
+
+    const saveResult = await saveInquiry(inquiryData);
+    userStates.delete(userId); // 状態をクリア
+
+    if (saveResult.success) {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: `✅ 問い合わせを送信しました！\n\n【受付ID】${saveResult.inquiryId}\n\n管理者が確認次第、対応させていただきます。\n通常1-2営業日以内に回答いたします。\n\nありがとうございました！`
+      });
+
+      // 管理者への通知（環境変数にADMIN_LINE_IDsが設定されている場合）
+      if (process.env.ADMIN_LINE_IDS) {
+        await notifyAdmins(client, { ...inquiryData, inquiryId: saveResult.inquiryId });
+      }
+    } else {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: `❌ 問い合わせ送信中にエラーが発生しました。\n\n${saveResult.error}\n\n恐れ入りますが、しばらく後に再度お試しください。`
+      });
+    }
+  } else {
+    await client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '❓ 「送信」または「キャンセル」で回答してください。'
+    });
+  }
+}
+
+// 問い合わせ保存
+async function saveInquiry(inquiryData) {
+  try {
+    const { GoogleAuth } = await import('google-auth-library');
+    const { google } = await import('googleapis');
+    
+    const auth = new GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const inquiryId = `INQ${Date.now()}`;
+    const values = [[
+      inquiryId,                    // A: inquiry_id
+      inquiryData.timestamp,        // B: timestamp
+      inquiryData.userId,           // C: line_user_id
+      inquiryData.userName,         // D: user_name
+      inquiryData.userEmail,        // E: user_email
+      inquiryData.content,          // F: content
+      '未対応',                     // G: status
+      '',                           // H: admin_response
+      '',                           // I: handled_by
+      ''                            // J: handled_at
+    ]];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+      range: 'inquiries!A:J',
+      valueInputOption: 'RAW',
+      resource: { values }
+    });
+    
+    console.log(`✅ Inquiry saved: ${inquiryId} from ${inquiryData.userName}`);
+    return { success: true, inquiryId: inquiryId };
+  } catch (error) {
+    console.error('Inquiry save failed:', error);
+    return { 
+      success: false, 
+      error: error.message.includes('Unable to parse range') 
+        ? 'inquiriesシートが見つかりません' 
+        : 'データベースエラーが発生しました'
+    };
+  }
+}
+
+// 管理者への通知
+async function notifyAdmins(client, inquiryData) {
+  try {
+    const adminIds = process.env.ADMIN_LINE_IDS.split(',').map(id => id.trim());
+    
+    const message = {
+      type: 'text',
+      text: `🔔 新しい問い合わせがあります\n\n【ID】${inquiryData.inquiryId}\n【送信者】${inquiryData.userName}\n【メール】${inquiryData.userEmail}\n【内容】\n${inquiryData.content}\n\n「問い合わせ一覧」で詳細確認できます。`
+    };
+    
+    for (const adminId of adminIds) {
+      await client.pushMessage(adminId, message);
+    }
+    
+    console.log(`📢 Notified ${adminIds.length} admins about inquiry: ${inquiryData.inquiryId}`);
+  } catch (error) {
+    console.error('Admin notification failed:', error);
+  }
+}
+
+// 管理メニュー
+async function handleAdminMenu(event, client, userId) {
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: `⚙️ 管理者メニュー\n\n以下のコマンドが利用できます：\n\n• 統計 - システム統計情報\n• 問い合わせ一覧 - 未対応問い合わせ\n• ヘルプ - コマンド一覧\n\nコマンドを入力してください。`
+  });
+}
+
+// システム統計情報
+async function getSystemStats() {
+  try {
+    const { GoogleAuth } = await import('google-auth-library');
+    const { google } = await import('googleapis');
+    
+    const auth = new GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // ユーザー数取得
+    const usersResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+      range: 'users!A:G',
+    });
+    const totalUsers = (usersResponse.data.values || []).length - 1; // ヘッダー除く
+    
+    // マニュアル数取得
+    const manualsResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+      range: 'manuals!A:L',
+    });
+    const totalManuals = (manualsResponse.data.values || []).length - 1; // ヘッダー除く
+    
+    // 問い合わせ数取得（inquiriesシートが存在する場合）
+    let totalInquiries = 0;
+    let pendingInquiries = 0;
+    try {
+      const inquiriesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.SPREADSHEET_ID,
+        range: 'inquiries!A:J',
+      });
+      const inquiries = (inquiriesResponse.data.values || []).slice(1); // ヘッダー除く
+      totalInquiries = inquiries.length;
+      pendingInquiries = inquiries.filter(inquiry => inquiry[6] === '未対応').length;
+    } catch (error) {
+      console.log('Inquiries sheet not found or empty');
+    }
+    
+    return {
+      text: `📊 システム統計情報\n\n【ユーザー】\n• 登録ユーザー数: ${totalUsers}名\n\n【マニュアル】\n• 総マニュアル数: ${totalManuals}件\n\n【問い合わせ】\n• 総問い合わせ数: ${totalInquiries}件\n• 未対応: ${pendingInquiries}件\n\n【システム】\n• 最終更新: ${new Date().toLocaleString('ja-JP')}`
+    };
+  } catch (error) {
+    console.error('Stats retrieval failed:', error);
+    return {
+      text: `❌ 統計情報の取得中にエラーが発生しました。\n\n${error.message}`
+    };
+  }
+}
+
+// 未対応問い合わせ一覧
+async function getPendingInquiries() {
+  try {
+    const { GoogleAuth } = await import('google-auth-library');
+    const { google } = await import('googleapis');
+    
+    const auth = new GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+      range: 'inquiries!A:J',
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return {
+        text: `📋 未対応問い合わせ一覧\n\n現在、未対応の問い合わせはありません。`
+      };
+    }
+
+    const inquiries = rows.slice(1); // ヘッダー除く
+    const pendingInquiries = inquiries.filter(inquiry => inquiry[6] === '未対応');
+    
+    if (pendingInquiries.length === 0) {
+      return {
+        text: `📋 未対応問い合わせ一覧\n\n現在、未対応の問い合わせはありません。\n\n総問い合わせ数: ${inquiries.length}件`
+      };
+    }
+    
+    let result = `📋 未対応問い合わせ一覧 (${pendingInquiries.length}件)\n\n`;
+    
+    // 最新5件まで表示
+    const displayInquiries = pendingInquiries.slice(0, 5);
+    displayInquiries.forEach((inquiry, index) => {
+      const id = inquiry[0] || '';
+      const timestamp = inquiry[1] || '';
+      const userName = inquiry[3] || '';
+      const content = inquiry[5] || '';
+      
+      const date = timestamp ? new Date(timestamp).toLocaleDateString('ja-JP') : '';
+      const truncatedContent = content.length > 50 ? content.substring(0, 50) + '...' : content;
+      
+      result += `${index + 1}. ${id}\n`;
+      result += `   日時: ${date}\n`;
+      result += `   送信者: ${userName}\n`;
+      result += `   内容: ${truncatedContent}\n\n`;
+    });
+    
+    if (pendingInquiries.length > 5) {
+      result += `他 ${pendingInquiries.length - 5}件の未対応問い合わせがあります。\n\nGoogle Sheetsで詳細を確認してください。`;
+    }
+    
+    return { text: result };
+  } catch (error) {
+    console.error('Pending inquiries retrieval failed:', error);
+    return {
+      text: `❌ 問い合わせ一覧の取得中にエラーが発生しました。\n\n${error.message.includes('Unable to parse range') ? 'inquiriesシートが見つかりません' : error.message}`
+    };
+  }
 }
