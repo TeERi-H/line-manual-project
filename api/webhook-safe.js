@@ -154,6 +154,16 @@ async function handleTextMessage(event) {
     
     replyMessage = `✅ システム動作テスト結果\n\n• LINE連携: OK\n• サーバー: OK\n• データベース: ${dbStatus}\n• 時刻: ${new Date().toLocaleString('ja-JP')}\n\n${dbDetails}\n\n基本システム動作中！`;
     
+  } else if (text.includes('問い合わせ一覧')) {
+    // 問い合わせ一覧（管理者のみ）- より具体的な条件を先にチェック
+    const registrationStatus = await checkUserRegistration(userId);
+    if (registrationStatus.isRegistered && registrationStatus.permission === '管理者') {
+      const inquiryListResult = await getPendingInquiries();
+      replyMessage = inquiryListResult.text;
+    } else {
+      replyMessage = `❌ 管理者権限が必要です。`;
+    }
+    
   } else if (text.includes('問い合わせ') || text.includes('お問い合わせ')) {
     // 登録済みユーザーの問い合わせ機能
     const registrationStatus = await checkUserRegistration(userId);
@@ -178,16 +188,6 @@ async function handleTextMessage(event) {
     if (registrationStatus.isRegistered && registrationStatus.permission === '管理者') {
       const statsResult = await getSystemStats();
       replyMessage = statsResult.text;
-    } else {
-      replyMessage = `❌ 管理者権限が必要です。`;
-    }
-    
-  } else if (text.includes('問い合わせ一覧')) {
-    // 問い合わせ一覧（管理者のみ）
-    const registrationStatus = await checkUserRegistration(userId);
-    if (registrationStatus.isRegistered && registrationStatus.permission === '管理者') {
-      const inquiryListResult = await getPendingInquiries();
-      replyMessage = inquiryListResult.text;
     } else {
       replyMessage = `❌ 管理者権限が必要です。`;
     }
