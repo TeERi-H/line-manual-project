@@ -328,12 +328,15 @@ async function checkUserRegistration(userId) {
     const userRow = rows.find(row => row[3] === userId); // line_id列
     
     if (userRow) {
-      return {
+      const userInfo = {
         isRegistered: true,
         email: userRow[0],
         name: userRow[1],
+        permission: userRow[2] || '一般', // C列: permission
         createdAt: userRow[4]
       };
+      console.log(`👤 User info retrieved: ${userInfo.name}, permission: ${userInfo.permission}`);
+      return userInfo;
     }
     
     return { isRegistered: false };
