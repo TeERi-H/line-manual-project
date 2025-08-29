@@ -140,8 +140,16 @@ async function handleTextMessage(event) {
     replyMessage = `📞 お問い合わせ\n\n問い合わせ機能は実装準備中です。\n\n【緊急時の連絡先】\n• システム管理者まで直接ご連絡ください\n• 現在のステータス: β版テスト中`;
     
   } else {
-    // 一般的なメッセージへの応答
-    replyMessage = `こんにちは！LINE Manual Botです。\n\n「${text}」について検索機能を準備中です。\n\n現在利用可能なコマンド：\n• ヘルプ\n• テスト\n• 問い合わせ`;
+    // 登録済みユーザーのキーワード検索
+    const registrationStatus = await checkUserRegistration(userId);
+    if (registrationStatus.isRegistered) {
+      console.log(`🔍 Search request from registered user: ${registrationStatus.name} - "${text}"`);
+      const searchResult = await searchManuals(text, registrationStatus.permission || '一般');
+      replyMessage = searchResult.text;
+    } else {
+      // 未登録ユーザーへの案内
+      replyMessage = `こんにちは！LINE Manual Botです。\n\nマニュアル検索機能をご利用いただくには、まず「登録」が必要です。\n\n「登録」と入力してユーザー登録を行ってください。\n\n【利用可能なコマンド】\n• 登録 - ユーザー登録\n• ヘルプ - 使い方\n• テスト - 動作確認`;
+    }
   }
 
   await client.replyMessage(event.replyToken, {
@@ -486,4 +494,155 @@ async function saveUserRegistration(userId, userState) {
         : 'データベースエラーが発生しました'
     };
   }
+}
+
+// マニュアル検索機能
+async function searchManuals(keyword, userPermission = '一般') {
+  try {
+    console.log(`🔍 Searching for: "${keyword}" with permission: ${userPermission}`);
+    
+    const { GoogleAuth } = await import('google-auth-library');
+    const { google } = await import('googleapis');
+    
+    const auth = new GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // manualsシートからデータ取得
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+      range: 'manuals!A:L',
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return {
+        text: '📚 マニュアルデータが見つかりませんでした。\n\n管理者にお問い合わせください。'
+      };
+    }
+
+    // ヘッダー行を除く
+    const manuals = rows.slice(1);
+    console.log(`📊 Total manuals in database: ${manuals.length}`);
+    
+    // 検索処理
+    const results = manuals.filter(manual => {
+      // 有効フラグチェック（L列: is_active）
+      if (manual[11] !== 'TRUE') {
+        return false;
+      }
+      
+      // 権限チェック（I列: required_permission）
+      const requiredPermission = manual[8] || '一般';
+      if (!checkPermission(requiredPermission, userPermission)) {
+        return false;
+      }
+      
+      // キーワード検索（部分一致・大文字小文字無視）
+      const keywordLower = keyword.toLowerCase();
+      const searchTargets = [
+        manual[1] || '', // B: 大カテゴリ
+        manual[2] || '', // C: 中カテゴリ  
+        manual[3] || '', // D: 小カテゴリ
+        manual[4] || '', // E: タイトル
+        manual[5] || '', // F: 本文
+        manual[9] || '', // J: タグ
+      ];
+      
+      return searchTargets.some(target => 
+        target.toLowerCase().includes(keywordLower)
+      );
+    });
+    
+    console.log(`🎯 Search results: ${results.length} matches`);
+    
+    // 結果を整形して返却
+    return formatSearchResults(results, keyword);
+    
+  } catch (error) {
+    console.error('❌ Manual search failed:', error);
+    return {
+      text: '❌ 検索中にエラーが発生しました。\n\nしばらく後に再度お試しください。\n\n「ヘルプ」で使い方を確認できます。'
+    };
+  }
+}
+
+// 権限チェック
+function checkPermission(requiredPermission, userPermission) {
+  const permissionLevels = {
+    '一般': 1,
+    '総務': 2,
+    '役職': 3,
+    '管理者': 4
+  };
+  
+  const required = permissionLevels[requiredPermission] || 1;
+  const user = permissionLevels[userPermission] || 1;
+  
+  return user >= required;
+}
+
+// 検索結果の整形
+function formatSearchResults(results, keyword) {
+  if (results.length === 0) {
+    return {
+      text: `🔍 「${keyword}」の検索結果\n\n該当するマニュアルが見つかりませんでした。\n\n【検索のコツ】\n• 別のキーワードで検索\n• 短いキーワードで検索\n• ひらがな/カタカナで検索\n\n「ヘルプ」で詳しい使い方を確認できます。`
+    };
+  }
+  
+  if (results.length === 1) {
+    // 単一結果の詳細表示
+    return formatSingleResult(results[0], keyword);
+  }
+  
+  // 複数結果のリスト表示（最大5件）
+  return formatMultipleResults(results.slice(0, 5), keyword);
+}
+
+// 単一結果の詳細表示
+function formatSingleResult(manual, keyword) {
+  const title = manual[4] || '無題';
+  const content = manual[5] || '';
+  const category = [manual[1], manual[2], manual[3]].filter(Boolean).join(' > ');
+  const tags = manual[9] || '';
+  const lastUpdated = manual[10] || '';
+  
+  // 本文を適度な長さに制限
+  const truncatedContent = content.length > 200 
+    ? content.substring(0, 200) + '...' 
+    : content;
+  
+  let result = `🔍 「${keyword}」の検索結果\n\n`;
+  result += `📋 ${title}\n`;
+  if (category) result += `📁 ${category}\n`;
+  result += `\n${truncatedContent}\n`;
+  if (tags) result += `\n🏷️ ${tags}\n`;
+  if (lastUpdated) result += `📅 更新日: ${lastUpdated}\n`;
+  result += `\n他のキーワードでも検索できます！`;
+  
+  return { text: result };
+}
+
+// 複数結果のリスト表示
+function formatMultipleResults(results, keyword) {
+  let result = `🔍 「${keyword}」の検索結果 (${results.length}件)\n\n`;
+  
+  results.forEach((manual, index) => {
+    const title = manual[4] || '無題';
+    const category = [manual[1], manual[2], manual[3]].filter(Boolean).join(' > ');
+    
+    result += `${index + 1}. 📋 ${title}\n`;
+    if (category) result += `   📁 ${category}\n`;
+    result += '\n';
+  });
+  
+  result += `詳細を見るには、具体的なタイトルで再検索してください。\n\n「ヘルプ」で検索のコツを確認できます！`;
+  
+  return { text: result };
 }
