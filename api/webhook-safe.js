@@ -44,6 +44,8 @@ export default async function handler(req, res) {
             await handleTextMessage(event);
           } else if (event.type === 'follow') {
             await handleFollowEvent(event);
+          } else if (event.type === 'postback') {
+            await handlePostbackEvent(event);
           }
           
         } catch (eventError) {
@@ -1041,4 +1043,341 @@ async function getPendingInquiries() {
       text: `❌ 問い合わせ一覧の取得中にエラーが発生しました。\n\n${error.message.includes('Unable to parse range') ? 'inquiriesシートが見つかりません' : error.message}`
     };
   }
+}
+
+// ポストバックイベント処理
+async function handlePostbackEvent(event) {
+  const { Client } = await import('@line/bot-sdk');
+  
+  const client = new Client({
+    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+    channelSecret: process.env.LINE_CHANNEL_SECRET,
+  });
+
+  const userId = event.source.userId;
+  const postbackData = event.postback.data;
+  
+  console.log(`📱 Postback received from ${userId}: ${postbackData}`);
+
+  try {
+    // postbackDataをパース（action=value形式）
+    const params = new URLSearchParams(postbackData);
+    const action = params.get('action');
+    
+    // ユーザー登録状況を確認
+    const registrationStatus = await checkUserRegistration(userId);
+    if (!registrationStatus.isRegistered) {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '🔒 リッチメニューをご利用いただくには、まず「登録」が必要です。\n\n「登録」と入力してユーザー登録を行ってください。'
+      });
+      return;
+    }
+
+    // アクション別処理
+    switch (action) {
+      case 'keyword_search':
+        await handleKeywordSearchAction(event, client, userId, registrationStatus);
+        break;
+      
+      case 'category_search':
+        await handleCategorySearchAction(event, client, userId, registrationStatus);
+        break;
+      
+      case 'help':
+        await handleHelpAction(event, client, userId, registrationStatus);
+        break;
+      
+      case 'inquiry':
+        await handleInquiryAction(event, client, userId, registrationStatus);
+        break;
+      
+      case 'popular_manuals':
+        await handlePopularManualsAction(event, client, userId, registrationStatus);
+        break;
+      
+      case 'mypage':
+        await handleMyPageAction(event, client, userId, registrationStatus);
+        break;
+      
+      case 'category_selected':
+        const selectedCategory = params.get('category');
+        await handleCategorySelected(event, client, userId, registrationStatus, selectedCategory);
+        break;
+      
+      default:
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '❓ 不明なメニューが選択されました。\n\n「ヘルプ」で使い方を確認してください。'
+        });
+        break;
+    }
+
+  } catch (error) {
+    console.error('❌ Postback processing error:', error);
+    await client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '❌ メニュー処理中にエラーが発生しました。\n\nしばらく後に再度お試しください。'
+    });
+  }
+}
+
+// キーワード検索アクション
+async function handleKeywordSearchAction(event, client, userId, userInfo) {
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: '🔍 キーワード検索\n\n検索したいキーワードを入力してください。\n\n【検索例】\n• 「経費精算」\n• 「有給休暇」\n• 「勤怠管理」\n\nキーワードを入力して検索開始！',
+    quickReply: {
+      items: [
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: '経費精算',
+            text: '経費精算'
+          }
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: '有給休暇',
+            text: '有給休暇'
+          }
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: '勤怠管理',
+            text: '勤怠管理'
+          }
+        }
+      ]
+    }
+  });
+  
+  console.log(`🔍 Keyword search prompt sent to user: ${userInfo.name}`);
+}
+
+// カテゴリ検索アクション
+async function handleCategorySearchAction(event, client, userId, userInfo) {
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: '📚 カテゴリ検索\n\nカテゴリを選択してください：',
+    quickReply: {
+      items: [
+        {
+          type: 'action',
+          action: {
+            type: 'postback',
+            label: '📊 経理',
+            data: 'action=category_selected&category=経理',
+            displayText: '経理カテゴリを検索'
+          }
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'postback',
+            label: '👥 人事',
+            data: 'action=category_selected&category=人事',
+            displayText: '人事カテゴリを検索'
+          }
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'postback',
+            label: '⚙️ 総務',
+            data: 'action=category_selected&category=総務',
+            displayText: '総務カテゴリを検索'
+          }
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'postback',
+            label: '💼 営業',
+            data: 'action=category_selected&category=営業',
+            displayText: '営業カテゴリを検索'
+          }
+        }
+      ]
+    }
+  });
+  
+  console.log(`📚 Category search menu sent to user: ${userInfo.name}`);
+}
+
+// ヘルプアクション
+async function handleHelpAction(event, client, userId, userInfo) {
+  let helpText = `📋 LINE Manual Bot ヘルプ\n\n【リッチメニュー】\n• 🔍 キーワード検索 - 自由検索\n• 📚 カテゴリ検索 - カテゴリ別\n• ❓ ヘルプ - 使い方\n• 📝 問い合わせ - サポート\n• 📊 人気マニュアル - よく見られる資料\n• 👤 マイページ - 個人情報`;
+  
+  // 管理者の場合は管理機能を追加
+  if (userInfo.permission === '管理者') {
+    helpText += `\n\n【管理者機能】\n• 統計 - システム統計\n• 問い合わせ一覧 - 未対応確認\n• 管理 - 管理メニュー`;
+  }
+  
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: helpText
+  });
+  
+  console.log(`❓ Help sent to user: ${userInfo.name} (${userInfo.permission})`);
+}
+
+// 問い合わせアクション
+async function handleInquiryAction(event, client, userId, userInfo) {
+  return await startInquiry(event, client, userId, userInfo);
+}
+
+// 人気マニュアルアクション（新機能）
+async function handlePopularManualsAction(event, client, userId, userInfo) {
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: '📊 人気マニュアル機能\n\n現在実装準備中です。\n\n近日中によく検索されるマニュアルTOP5を表示予定です。\n\n「キーワード検索」や「カテゴリ検索」をご利用ください。'
+  });
+  
+  console.log(`📊 Popular manuals accessed by user: ${userInfo.name}`);
+}
+
+// マイページアクション（新機能）
+async function handleMyPageAction(event, client, userId, userInfo) {
+  const registrationDate = userInfo.createdAt ? new Date(userInfo.createdAt).toLocaleDateString('ja-JP') : '不明';
+  
+  let myPageText = `👤 マイページ\n\n【登録情報】\n• お名前: ${userInfo.name}\n• メール: ${userInfo.email}\n• 権限レベル: ${userInfo.permission}\n• 登録日: ${registrationDate}`;
+  
+  // 管理者の場合は管理機能へのショートカット追加
+  if (userInfo.permission === '管理者') {
+    myPageText += `\n\n【管理者メニュー】\n「統計」「問い合わせ一覧」「管理」\nのコマンドが利用できます。`;
+  }
+  
+  myPageText += `\n\n【機能】\n• 検索履歴: 近日実装予定\n• 利用統計: 近日実装予定`;
+  
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: myPageText
+  });
+  
+  console.log(`👤 MyPage accessed by user: ${userInfo.name} (${userInfo.permission})`);
+}
+
+// カテゴリ選択処理
+async function handleCategorySelected(event, client, userId, userInfo, category) {
+  console.log(`📚 Category selected: ${category} by user: ${userInfo.name}`);
+  
+  // カテゴリでマニュアルを検索
+  const searchResult = await searchManualsByCategory(category, userInfo.permission || '一般');
+  
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: searchResult.text
+  });
+}
+
+// カテゴリ別マニュアル検索
+async function searchManualsByCategory(category, userPermission = '一般') {
+  try {
+    console.log(`🔍 Searching by category: "${category}" with permission: ${userPermission}`);
+    
+    const { GoogleAuth } = await import('google-auth-library');
+    const { google } = await import('googleapis');
+    
+    const auth = new GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // manualsシートからデータ取得
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SPREADSHEET_ID,
+      range: 'manuals!A:L',
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return {
+        text: '📚 マニュアルデータが見つかりませんでした。\n\n管理者にお問い合わせください。'
+      };
+    }
+
+    // ヘッダー行を除く
+    const manuals = rows.slice(1);
+    console.log(`📊 Total manuals in database: ${manuals.length}`);
+    
+    // カテゴリ検索処理
+    const results = manuals.filter(manual => {
+      // 有効フラグチェック（L列: is_active）
+      if (manual[11] !== 'TRUE') {
+        return false;
+      }
+      
+      // 権限チェック（I列: required_permission）
+      const requiredPermission = manual[8] || '一般';
+      if (!checkPermission(requiredPermission, userPermission)) {
+        return false;
+      }
+      
+      // カテゴリ検索（B,C,D列：大カテゴリ、中カテゴリ、小カテゴリ）
+      const categories = [
+        manual[1] || '', // B: 大カテゴリ
+        manual[2] || '', // C: 中カテゴリ  
+        manual[3] || '', // D: 小カテゴリ
+      ];
+      
+      return categories.some(cat => cat.includes(category));
+    });
+    
+    console.log(`🎯 Category search results: ${results.length} matches for "${category}"`);
+    
+    // 結果を整形して返却
+    return formatCategorySearchResults(results, category);
+    
+  } catch (error) {
+    console.error('❌ Category search failed:', error);
+    return {
+      text: '❌ カテゴリ検索中にエラーが発生しました。\n\nしばらく後に再度お試しください。'
+    };
+  }
+}
+
+// カテゴリ検索結果の整形
+function formatCategorySearchResults(results, category) {
+  if (results.length === 0) {
+    return {
+      text: `📚 「${category}」カテゴリの検索結果\n\n該当するマニュアルが見つかりませんでした。\n\n【他の検索方法】\n• キーワード検索を試してみる\n• 別のカテゴリを選択\n• 「ヘルプ」で使い方確認`
+    };
+  }
+  
+  if (results.length === 1) {
+    // 単一結果の詳細表示
+    return formatSingleResult(results[0], `${category}カテゴリ`);
+  }
+  
+  // 複数結果のリスト表示（最大5件）
+  let result = `📚 「${category}」カテゴリの検索結果 (${results.length}件)\n\n`;
+  
+  const displayResults = results.slice(0, 5);
+  displayResults.forEach((manual, index) => {
+    const title = manual[4] || '無題';
+    const subcategory = [manual[2], manual[3]].filter(Boolean).join(' > ');
+    
+    result += `${index + 1}. 📋 ${title}\n`;
+    if (subcategory) result += `   📁 ${subcategory}\n`;
+    result += '\n';
+  });
+  
+  if (results.length > 5) {
+    result += `他 ${results.length - 5}件のマニュアルがあります。`;
+  }
+  
+  result += `\n詳細を見るには、具体的なタイトルで「キーワード検索」してください。`;
+  
+  return { text: result };
 }
