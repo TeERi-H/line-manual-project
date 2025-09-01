@@ -1311,16 +1311,26 @@ async function searchManualsByCategory(category, userPermission = '一般') {
     const manuals = rows.slice(1);
     console.log(`📊 Total manuals in database: ${manuals.length}`);
     
-    // カテゴリ検索処理
-    const results = manuals.filter(manual => {
+    // カテゴリ検索処理（デバッグ情報付き）
+    const results = manuals.filter((manual, index) => {
+      // デバッグ: 最初の3件のデータ構造をログ出力
+      if (index < 3) {
+        console.log(`📊 Manual ${index + 1} structure:`, {
+          A: manual[0], B: manual[1], C: manual[2], D: manual[3], 
+          E: manual[4], F: manual[5], I: manual[8], L: manual[11]
+        });
+      }
+      
       // 有効フラグチェック（L列: is_active）
       if (manual[11] !== 'TRUE') {
+        if (index < 3) console.log(`❌ Manual ${index + 1} inactive: ${manual[11]}`);
         return false;
       }
       
       // 権限チェック（I列: required_permission）
       const requiredPermission = manual[8] || '一般';
       if (!checkPermission(requiredPermission, userPermission)) {
+        if (index < 3) console.log(`❌ Manual ${index + 1} permission denied: requires ${requiredPermission}, user has ${userPermission}`);
         return false;
       }
       
@@ -1331,7 +1341,17 @@ async function searchManualsByCategory(category, userPermission = '一般') {
         manual[3] || '', // D: 小カテゴリ
       ];
       
-      return categories.some(cat => cat.includes(category));
+      // デバッグ: カテゴリマッチング詳細
+      const isMatch = categories.some(cat => cat.includes(category));
+      if (index < 3) {
+        console.log(`🔍 Manual ${index + 1} category check:`, {
+          searching: category,
+          categories: categories,
+          match: isMatch
+        });
+      }
+      
+      return isMatch;
     });
     
     console.log(`🎯 Category search results: ${results.length} matches for "${category}"`);
