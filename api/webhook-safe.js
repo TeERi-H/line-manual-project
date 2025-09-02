@@ -194,6 +194,27 @@ async function handleTextMessage(event) {
       replyMessage = `❌ 管理者権限が必要です。`;
     }
     
+  } else if (text.includes('カテゴリを検索') || text.includes('カテゴリ検索')) {
+    // デバッグ用: テキストでのカテゴリ検索テスト
+    const registrationStatus = await checkUserRegistration(userId);
+    if (registrationStatus.isRegistered) {
+      let category = '';
+      if (text.includes('経理')) category = '経理';
+      else if (text.includes('人事')) category = '人事';
+      else if (text.includes('総務')) category = '総務';
+      else if (text.includes('営業')) category = '営業';
+      
+      if (category) {
+        console.log(`🧪 DEBUG: Text-based category search for: ${category} by user: ${registrationStatus.name}`);
+        const searchResult = await searchManualsByCategory(category, registrationStatus.permission || '一般');
+        replyMessage = searchResult.text;
+      } else {
+        replyMessage = `📚 カテゴリ検索テスト\n\n以下のように入力してテストしてください：\n• 「経理カテゴリを検索」\n• 「人事カテゴリを検索」\n• 「総務カテゴリを検索」\n• 「営業カテゴリを検索」`;
+      }
+    } else {
+      replyMessage = `📚 カテゴリ検索をするには、まず「登録」が必要です。`;
+    }
+    
   } else {
     // 登録済みユーザーのキーワード検索
     const registrationStatus = await checkUserRegistration(userId);
