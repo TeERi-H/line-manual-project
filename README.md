@@ -1,120 +1,126 @@
-# LINE Manual Project
+# 📚 LINE業務マニュアルBot
 
-LINE型業務マニュアルシステム
+社内業務マニュアルを LINE で簡単検索・閲覧できるシステムです。
 
-## プロジェクト概要
+## 🚀 使い方
 
-このプロジェクトは、社内業務マニュアルをLINE Bot経由で検索・閲覧できるシステムです。
+### 📱 LINE友だち追加
 
-### 主な機能
-- LINE Botによるマニュアル検索
-- カテゴリ別マニュアル閲覧
-- ユーザー権限管理
-- 問い合わせ・要望機能
-- アクセスログ記録
+以下の方法でBotを友だち追加してください：
 
-## 技術スタック
+#### QRコード
+![QRコード](https://qr.quel.jp/url.php?url=https://line.me/ti/p/@[YOUR_LINE_BOT_ID])
 
-- **プラットフォーム**: Vercel (Serverless Functions)
-- **言語**: Node.js (JavaScript)
-- **LINE API**: @line/bot-sdk
-- **データベース**: Google Sheets (googleapis)
-- **認証**: LINE認証 + Google サービスアカウント
+#### LINE公式アカウント
+**アカウント名**: LINE業務マニュアルBot  
+**LINE ID**: @[YOUR_LINE_BOT_ID]
 
-## プロジェクト構造
-
+#### 友だち追加URL
 ```
-line-manual-project/
-├── api/                 # Vercel Serverless Functions
-│   ├── webhook.js      # LINE Webhook エンドポイント
-│   └── health.js       # ヘルスチェック API
-├── lib/                # 共通ライブラリ
-├── utils/              # ユーティリティ関数
-├── docs/               # ドキュメント
-├── package.json        # 依存関係とスクリプト
-├── vercel.json         # Vercel設定
-└── README.md           # このファイル
+https://line.me/ti/p/@[YOUR_LINE_BOT_ID]
 ```
 
-## 開発コマンド
+> ⚠️ **注意**: 上記の `[YOUR_LINE_BOT_ID]` は実際のLINE Bot IDに置き換えてください
 
-```bash
-# 依存関係のインストール
-npm install
+### 🎯 基本操作
 
-# ローカル開発サーバーの起動
-npm run dev
+#### 1️⃣ 初回利用（ユーザー登録）
+1. 友だち追加後、「**登録**」と入力
+2. メールアドレスを入力
+3. 氏名を入力  
+4. 登録内容を確認して完了
 
-# 本番デプロイ
-npm run deploy
+#### 2️⃣ マニュアル検索
+- **キーワード検索**: 「経費精算」「有給休暇」等を直接入力
+- **カテゴリ検索**: 「経理カテゴリを検索」「人事カテゴリを検索」等を入力
 
-# テストの実行
-npm test
-```
+#### 3️⃣ その他の機能
+- **ヘルプ**: 「ヘルプ」と入力で使い方確認
+- **問い合わせ**: 「問い合わせ」と入力でサポートに連絡
+- **テスト**: 「テスト」と入力でシステム動作確認
 
-## セットアップ手順
+### 🎛️ リッチメニュー（準備中）
+画面下部に以下のメニューボタンが表示予定：
 
-### 1. 環境変数の設定
+| 🔍 キーワード検索 | 📚 カテゴリ検索 | ❓ ヘルプ |
+|:---:|:---:|:---:|
+| **📝 問い合わせ** | **📊 人気マニュアル** | **👤 マイページ** |
 
-`.env.local` ファイルを作成し、以下の環境変数を設定:
+## 🔑 権限レベル
 
-```env
-# LINE設定
-LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token
-LINE_CHANNEL_SECRET=your_line_channel_secret
+| 権限 | アクセス可能な内容 |
+|:---|:---|
+| 一般 | 基本的な業務マニュアル |
+| 総務 | 一般 + 総務関連マニュアル |
+| 役職 | 一般 + 総務 + 役職者向けマニュアル |
+| 管理者 | 全マニュアル + 管理機能 |
 
-# Google設定
-GOOGLE_SERVICE_ACCOUNT_EMAIL=your_service_account@project.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nyour_private_key\n-----END PRIVATE KEY-----\n"
-SPREADSHEET_ID=your_spreadsheet_id
+### 🛠️ 管理者専用コマンド
+- **統計**: システム利用統計の確認
+- **問い合わせ一覧**: 未対応の問い合わせ確認
+- **管理**: 管理者メニューの表示
 
-# 管理者設定
-ADMIN_LINE_IDS=admin_user_id_1,admin_user_id_2
-```
+## 📞 サポート
 
-### 2. Vercelデプロイ
+### 🔧 トラブルシューティング
 
-```bash
-# Vercel CLIのインストール（初回のみ）
-npm install -g vercel
+#### Bot が応答しない場合
+1. 友だち追加されているか確認
+2. 「テスト」と入力してシステム状況を確認
+3. 改善しない場合は管理者にお問い合わせください
 
-# プロジェクトのデプロイ
-vercel
+#### マニュアルが見つからない場合
+1. **キーワードを変更**: 「経費」→「経費精算」など具体的に
+2. **カテゴリ検索を利用**: カテゴリから探してみる
+3. **ヘルプ確認**: 「ヘルプ」で検索のコツを確認
 
-# 本番環境にデプロイ
-vercel --prod
-```
+### 📧 お問い合わせ
 
-## API エンドポイント
+1. **Bot内問い合わせ機能**（推奨）
+   - LINEで「問い合わせ」と入力
+   - 管理者に自動通知されます
 
-### Health Check
-- **URL**: `/api/health`
-- **Method**: GET
-- **説明**: システムの稼働状況確認
+2. **直接連絡**
+   - システム管理者: [管理者メールアドレス]
+   - 緊急時: [緊急連絡先]
 
-### LINE Webhook
-- **URL**: `/api/webhook`
-- **Method**: POST
-- **説明**: LINE からのイベント受信
+## 🎉 主な機能
 
-## 開発状況
+### ✅ 実装済み機能
+- [x] ユーザー登録・認証システム
+- [x] キーワード検索機能
+- [x] カテゴリ検索機能
+- [x] 権限レベル別アクセス制御
+- [x] 問い合わせ・要望受付
+- [x] 管理者統計機能
+- [x] システム動作確認機能
 
-### 完了済み
-- [x] プロジェクト初期設定
-- [x] 基本的なディレクトリ構造
-- [x] Vercel設定
-- [x] ダミーAPIエンドポイント
+### 🔄 開発中機能
+- [ ] リッチメニュー（ボタン操作）
+- [ ] 人気マニュアル表示
+- [ ] 検索履歴機能
+- [ ] マイページ機能拡張
 
-### 次のステップ
-- [ ] LINE認証基盤の実装
-- [ ] Google Sheets連携
-- [ ] ユーザー登録機能
-- [ ] マニュアル検索機能
+## 🏢 システム情報
 
-## ライセンス
+### 📊 技術構成
+- **プラットフォーム**: Vercel (Serverless)
+- **データベース**: Google Sheets
+- **チャットボット**: LINE Messaging API
+- **開発言語**: Node.js (JavaScript)
 
-MIT
+### 🔗 関連リンク
+- **システム状況**: [https://line-manual-project-no2.vercel.app/api/health](https://line-manual-project-no2.vercel.app/api/health)
+- **GitHub**: [https://github.com/TeERi-H/line-manual-project](https://github.com/TeERi-H/line-manual-project)
+- **プロジェクトURL**: [https://line-manual-project-no2.vercel.app](https://line-manual-project-no2.vercel.app)
 
-## 貢献
+---
 
-プルリクエストやイシューの報告を歓迎します。
+### 📝 更新履歴
+- **2025-09-03**: リッチメニューポストバック機能実装
+- **2025-09-02**: 管理者機能・問い合わせ機能実装完了
+- **2025-09-01**: マニュアル検索機能実装完了
+- **2025-08-31**: ユーザー登録機能実装完了
+- **2025-08-30**: 基盤システム構築完了
+
+> 💡 **ヒント**: このBotは継続的に改善されています。新機能の要望がございましたら、Bot内の「問い合わせ」機能をご利用ください！
