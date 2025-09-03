@@ -9,18 +9,17 @@
 以下の方法でBotを友だち追加してください：
 
 #### QRコード
-![QRコード](https://qr.quel.jp/url.php?url=https://line.me/ti/p/@[YOUR_LINE_BOT_ID])
+<img src="./スクリーンショット/スクリーンショット 2025-09-04 072254.png" alt="LINE業務マニュアルBot QRコード" width="200" height="200">
+
+スマートフォンでLINEアプリを開き、上のQRコードを読み取って友だち追加してください。
 
 #### LINE公式アカウント
 **アカウント名**: LINE業務マニュアルBot  
-**LINE ID**: @[YOUR_LINE_BOT_ID]
 
-#### 友だち追加URL
-```
-https://line.me/ti/p/@[YOUR_LINE_BOT_ID]
-```
-
-> ⚠️ **注意**: 上記の `[YOUR_LINE_BOT_ID]` は実際のLINE Bot IDに置き換えてください
+#### 友だち追加方法
+1. **QRコード読み取り**（推奨）: 上のQRコードをスマートフォンで読み取り
+2. **LINE ID検索**: LINEアプリでID検索機能を使用
+3. **友だち追加URL**: 直接リンクから追加
 
 ### 🎯 基本操作
 
