@@ -1,10 +1,17 @@
 // リッチメニュー設定・管理API
 // リッチメニューの作成、アップロード、設定を行う管理用エンドポイント
 
-import { richMenuHandler } from '../lib/richMenuHandler.js';
+// Vercel環境での動的インポートを使用
+let richMenuHandler;
 
 export default async function handler(req, res) {
   try {
+    // richMenuHandlerの動的ロード
+    if (!richMenuHandler) {
+      const { richMenuHandler: handler } = await import('../lib/richMenuHandler.js');
+      richMenuHandler = handler;
+    }
+    
     console.log('Rich menu setup API called:', req.method);
     
     // CORS対応
