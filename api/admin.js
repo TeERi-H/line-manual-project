@@ -1,5 +1,5 @@
 // 管理者用API - リッチメニュー設定を含む
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     // CORS対応
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
 async function handleRichMenuAction(req, res, action) {
   try {
-    // richMenuHandlerを動的にロード
+    // richMenuHandlerを動的にロード（CommonJS）
     const { richMenuHandler } = await import('../lib/richMenuHandler.js');
 
     switch (action) {

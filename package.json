@@ -2,7 +2,6 @@
   "name": "line-manual-project",
   "version": "1.0.0",
   "description": "LINE型業務マニュアルシステム",
-  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "node server.js",
