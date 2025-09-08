@@ -38,12 +38,14 @@
 - **問い合わせ**: 「問い合わせ」と入力でサポートに連絡
 - **テスト**: 「テスト」と入力でシステム動作確認
 
-### 🎛️ リッチメニュー（準備中）
-画面下部に以下のメニューボタンが表示予定：
+### 🎛️ リッチメニュー
+画面下部のメニューボタンで簡単操作：
 
-| 🔍 キーワード検索 | 📚 カテゴリ検索 | ❓ ヘルプ |
+| 🔍 キーワード検索 | 📚 カテゴリ検索 | 📝 問い合わせ |
 |:---:|:---:|:---:|
-| **📝 問い合わせ** | **📊 人気マニュアル** | **👤 マイページ** |
+| **❓ ヘルプ** | **📊 人気マニュアル** | **👤 マイページ** |
+
+> **注意**: リッチメニューを表示するには管理者による設定が必要です。設定手順は下記をご覧ください。
 
 ## 🔑 権限レベル
 
@@ -115,7 +117,64 @@
 
 ---
 
+## 🔧 リッチメニュー設定手順（管理者向け）
+
+### 前提条件
+- LINE Developers Console へのアクセス権限
+- 環境変数設定権限（Vercel等）
+- `ADMIN_TOKEN` の設定
+
+### 設定手順
+
+#### 1️⃣ 自動セットアップスクリプト実行
+```bash
+# リッチメニューの作成と設定
+node scripts/setup-rich-menu.js
+
+# 既存のリッチメニューをクリーンアップ（必要に応じて）
+node scripts/setup-rich-menu.js cleanup
+```
+
+#### 2️⃣ API経由でのセットアップ
+```bash
+# リッチメニュー状況確認
+curl "https://your-app.vercel.app/api/rich-menu-setup?action=status&token=YOUR_ADMIN_TOKEN"
+
+# 完全セットアップ実行
+curl -X POST "https://your-app.vercel.app/api/rich-menu-setup?token=YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"setup"}'
+```
+
+#### 3️⃣ 環境変数の設定
+セットアップ後に表示される以下のIDを環境変数に設定：
+
+**Vercelの場合:**
+- Vercel Dashboard → Settings → Environment Variables
+- `RICH_MENU_MAIN_ID`: メインメニューID
+- `RICH_MENU_ADMIN_ID`: アドミンメニューID
+
+**ローカル開発:**
+```bash
+# .env.local に追加
+RICH_MENU_MAIN_ID=richmenu-xxxxxxxxx
+RICH_MENU_ADMIN_ID=richmenu-yyyyyyyyy
+```
+
+#### 4️⃣ リッチメニュー画像の作成（現在は画像なしで動作）
+- サイズ: 2500 × 1686 ピクセル
+- ファイル形式: JPG または PNG
+- ファイルサイズ: 1MB以下
+
+### トラブルシューティング
+- **メニューが表示されない**: 環境変数が正しく設定されているか確認
+- **ボタンが反応しない**: webhook URLが正しく設定されているか確認
+- **エラーが発生**: ログを確認し、LINE Developers Console の設定を確認
+
+---
+
 ### 📝 更新履歴
+- **2025-09-04**: リッチメニュー完全実装、フレックスメッセージ対応
 - **2025-09-03**: リッチメニューポストバック機能実装
 - **2025-09-02**: 管理者機能・問い合わせ機能実装完了
 - **2025-09-01**: マニュアル検索機能実装完了
