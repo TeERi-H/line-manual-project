@@ -20,6 +20,8 @@ export default async function handler(req, res) {
       const action = req.query.action;
       const token = req.query.token;
       
+      console.log(`GET request - action: ${action}, token: ${token ? 'provided' : 'missing'}`);
+      
       // リッチメニュー管理機能
       if (action && action.startsWith('richmenu-')) {
         // 簡単な認証
